@@ -1,0 +1,31 @@
+
+&global_settings
+  mpi_io_write_buffer_size = 1048576,
+&end
+
+&change_particle
+  name = "positron",
+&end
+
+&run_setup
+  semaphore_file = run_setup.semaphore,
+  lattice = "Lattice",
+  output = "run_setup.output.sdds",
+  p_central_mev = 149.9991295977183,
+  sigma = "run_setup.sigma.sdds",
+&end
+
+&run_control
+&end
+
+&twiss_output
+  filename = "twiss_output.filename.sdds",
+&end
+
+&sdds_beam
+  center_transversely = 1,
+  input = "distribution_from_ptc.sdds",
+&end
+
+&track
+&end
