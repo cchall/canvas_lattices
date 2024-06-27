@@ -46,8 +46,9 @@ y = np.array(madx_coordinates['y'])
 z = -np.array(madx_coordinates['t']) 
 px = np.array(madx_coordinates['px'])
 py = np.array(madx_coordinates['py'])
-# TODO: Need to double check the definition of pz between MAD-X and impactx
-pz = np.array(madx_coordinates['pt'])
+pz = -(kinematic.Converter(
+    energy=np.array(madx_coordinates['pt']) * reference['momentum'] + total_energy
+)(silent=True)['gamma'] - reference['gamma']) / reference['betagamma']
 
 ### Add distribution to simulation
 pc = sim.particle_container()
