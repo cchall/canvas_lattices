@@ -1,9 +1,14 @@
+"""
+Tested with impact-x fork: https://github.com/cchall/impactx
+"""
+
 import numpy as np
 
 import amrex.space3d as amr
 from impactx import Config, ImpactX, elements, distribution
 from rsbeams.rsstats import kinematic
 ################
+
 
 sim = ImpactX()
 
@@ -20,36 +25,22 @@ bunch_charge_C = 10.0e-15  # used if space charge
 total_energy = 0.15e9
 
 ref = sim.particle_container().ref_particle()
-ref.set_charge_qe(-1.0).set_mass_MeV(0.510998950).set_kin_energy_MeV(kinematic.Converter(energy=total_energy)(silent=True)['kenergy']*1e-6)
+ref.set_charge_qe(-1.0).set_mass_MeV(0.510998950).set_kin_energy_MeV(149.48900105)
 qm_eev = -1.0 / 0.510998950 / 1e6  # electron charge/mass in e / eV
 ref.z = 0
 
 ### Distribution from MAD-X
 
-with open('../ptc_particles.madx', 'r') as ff:
-    ptc_particles = ff.readlines()
+particles = np.load('bunched_beam.bunch.npy')
 
-quants = ('x', 'px', 'y', 'py', 't', 'pt')
 
-madx_coordinates = {}
-
-for line in ptc_particles:
-    for q in quants:
-        l =  line[11:]  # cut off 'ptc_start' at beginning
-        x = l.strip().split(q)[1][1:].split(',')[0].strip(';')
-        
-        value = madx_coordinates.setdefault(q, [])
-        value.append(float(x))
-
-x = np.array(madx_coordinates['x'])
-y = np.array(madx_coordinates['y'])
-z = -np.array(madx_coordinates['t']) 
-px = np.array(madx_coordinates['px'])
-py = np.array(madx_coordinates['py'])
-reference = kinematic.Converter(energy=total_energy)()
-pz = -(kinematic.Converter(
-    energy=np.array(madx_coordinates['pt']) * reference['momentum'] + total_energy
-)(silent=True)['gamma'] - reference['gamma']) / reference['betagamma']
+x = np.array(particles[:, 0])
+y = np.array(particles[:, 2])
+z = np.array(particles[:, 4] * constants.c) 
+px = np.array(particles[:, 1])
+py = np.array(particles[:, 3])
+reference = {'momentum': 149999129.59771833, 'velocity': 299790718.3997369, 'energy': 150000000.0, 'kenergy': 149489001.05, 'betagamma': 293.54097419910227, 'brho': 0.5003432394477326, 'beta': 0.9999941973181222, 'gamma': 293.54267753387757, 'p_unit': 'eV/c', 'e_unit': 'eV', 'mass': 510998.94999999995, 'mass_unit': 'eV/c^2', 'input': 150000000.0, 'input_unit': 'eV', 'input_type': 'energy'}
+pz = -1*(particles[:, 5] - reference['gamma']) / reference['betagamma']
 
 ### Add distribution to simulation
 pc = sim.particle_container()
@@ -87,7 +78,23 @@ pc.add_n_particles(
 
 ### Lattice import
 # Notebook lattice_setup.ipynb needs to be run to create this file
-sim.lattice.load_file('../madx/in.madx', nslice=1, beamline='IOTA')
+sim.lattice.load_file('in.madx', nslice=1)
+
+def lattice_length(lattice):
+    s = 0
+    for ele in lattice:
+        s+= ele.ds
+
+    return s
+
+for ele in sim.lattice:
+    if ele.__class__.__name__ == 'ShortRF':
+        print('Updating ShortRF')
+        ele.V /= ref.mass_MeV
+        if ele.freq < 0:
+            # ele.freq contains harm * -1 in this case
+            # calculate the time for a revolution * harm
+            ele.freq = -1 * reference['velocity'] / (lattice_length(sim.lattice) / reference['velocity'] * ele.freq)
 
 
 ### Run 1 turn
